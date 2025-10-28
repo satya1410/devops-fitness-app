@@ -1,51 +1,60 @@
 pipeline {
-    agent any
+  agent any
 
-    environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
-        IMAGE_NAME = "sai284/fitness-app"
+  environment {
+    IMAGE = "sai284/fitness-app"
+    DOCKER_CRED_ID = "dockerhub-creds"
+    CONTAINER_NAME = "devops-fitness"
+    APP_PORT = "5000"
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
     }
 
-    stages {
-        stage('Clone Repository') {
-            steps {
-                git branch: 'main', url: 'https://github.com/Satya1410/devops-fitness-app.git'
-            }
+    stage('Build') {
+      steps {
+        script {
+          // Build image with build number tag
+          sh "docker build -t ${IMAGE}:${BUILD_NUMBER} ."
         }
-
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    sh 'docker build -t ${IMAGE_NAME}:latest .'
-                }
-            }
-        }
-
-        stage('Login to DockerHub') {
-            steps {
-                script {
-                    sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
-                }
-            }
-        }
-
-        stage('Push to DockerHub') {
-            steps {
-                script {
-                    sh 'docker push ${IMAGE_NAME}:latest'
-                }
-            }
-        }
-
-        stage('Deploy Container') {
-            steps {
-                script {
-                    sh '''
-                    docker rm -f fitness-container || true
-                    docker run -d -p 5000:5000 --name fitness-container ${IMAGE_NAME}:latest
-                    '''
-                }
-            }
-        }
+      }
     }
+
+    stage('Docker Login & Push') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: "${DOCKER_CRED_ID}", usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
+          sh 'echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin'
+          sh "docker tag ${IMAGE}:${BUILD_NUMBER} ${IMAGE}:latest"
+          sh "docker push ${IMAGE}:${BUILD_NUMBER}"
+          sh "docker push ${IMAGE}:latest"
+        }
+      }
+    }
+
+    stage('Deploy') {
+      steps {
+        script {
+          // Deploy on same host where Jenkins runs (requires Docker access)
+          // Stop and remove old container, then start new one from :latest
+          sh """
+            docker rm -f ${CONTAINER_NAME} || true
+            docker run -d --name ${CONTAINER_NAME} -p ${APP_PORT}:${APP_PORT} ${IMAGE}:latest
+          """
+        }
+      }
+    }
+  }
+
+  post {
+    success {
+      echo "Deployed ${IMAGE}:latest (build ${BUILD_NUMBER})"
+    }
+    failure {
+      echo "Pipeline failed"
+    }
+  }
 }
