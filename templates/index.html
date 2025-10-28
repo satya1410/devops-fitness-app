@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fitness Tracker</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>🏋️ Fitness Tracker</h1>
+        <form method="POST">
+            <label>Weight (kg):</label>
+            <input type="number" name="weight" required>
+
+            <label>Height (cm):</label>
+            <input type="number" name="height" required>
+
+            <button type="submit">Calculate BMI</button>
+        </form>
+
+        {% if bmi %}
+            <h2>Your BMI: {{ bmi }}</h2>
+        {% endif %}
+    </div>
+</body>
+</html>
